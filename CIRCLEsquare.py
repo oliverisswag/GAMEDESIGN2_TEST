@@ -15,7 +15,6 @@
 # K_s                   down square
 # K_SPACE               jump
 #initialize pygame
-
 import os, random, time, pygame, math, datetime
 from turtle import screensize
 os.system('cls')
@@ -25,8 +24,8 @@ pygame.init()
 
 #Declare constants, variables, list, dictionaries, any object
 #scree size
-WIDTH=700
-HEIGHT=700
+WIDTH=400
+HEIGHT=600
 xMs=50
 yMs=250
 wb=30
@@ -168,94 +167,312 @@ def changeScreenSize(xm,ym):
         WIDTH=600
     screen=pygame.display.set_mode((WIDTH,HEIGHT))
  
-def playGame():
-    move=5 #pixels
-    #square variables
-    xs=20
-    ys=20
-    wbox=30
-    hbox=30
-    #circle variables
-    rad=15
-    xc=random.randint(rad, WIDTH-rad)
-    yc=random.randint(rad, HEIGHT-rad)
-    #inscribed Square:
-    ibox=int(rad*math.sqrt(2))
-    startpoint = (int(xc-ibox/2),int(yc-ibox/2))
-    print(startpoint[0]-ibox,startpoint[1])
-    insSquare=pygame.Rect(startpoint[0],startpoint[1],ibox,ibox)
-    #creating the rect object
-    square=pygame.Rect(xs,ys,wbox,hbox)
-    global MAIN
-    global LEV_I
-    startpoint = (int(xc-ibox/2),int(yc-ibox/2))
-    insSquare=pygame.Rect(startpoint[0],startpoint[1],ibox,ibox)
-    sq_color=colors.get(randColor)
-    MAX=10
-    jumpCount=MAX
-    JUMP=False
-    run=True
-    while run:
-        screen.fill(background)
-        keys=pygame.key.get_pressed()
-        for event in pygame.event.get():
-            if event.type==pygame.QUIT:
-                run=False
-                MAIN=True
-                LEV_I=False
-                print ("I want out", run)
-                
-        if keys[pygame.K_ESCAPE]:
-            run=False        
-        if keys[pygame.K_a] and square.x >=move:
-                square.x -= move #substract 5 from the x value
-        if keys[pygame.K_d] and square.x <WIDTH-wbox:
-            square.x += move  
-        #Jumping part
-        if not JUMP:
-            if keys[pygame.K_w]:
-                square.y -= move
-            if keys[pygame.K_s]:
-                square.y += move   
-            if keys[pygame.K_SPACE]:
-                JUMP=True
-        else:
-            if jumpCount >=-MAX:
-                square.y -= jumpCount*abs(jumpCount)/2
-                jumpCount-=1
-            else:
-                jumpCount=MAX
-                JUMP=False
+def game():
+    #import libraries
+    import pygame
+    import random
+    import os
+    from pygame import mixer
+    from spritesheet import SpriteSheet
+    from enemy import Enemy
 
-    #Finish circle
-        if keys[pygame.K_LEFT] and xc >=rad+move:
-            xc -= move #substract 5 from the x value
-            insSquare.x -= move
-        if keys[pygame.K_RIGHT] and xc <=WIDTH -(rad+move):
-            xc += move #substract 5 from the x value  
-            insSquare.x += move
-        if keys[pygame.K_DOWN] and yc <=HEIGHT-(rad+move):
-            yc += move #substract 5 from the x value
-            insSquare.y += move
-        if keys[pygame.K_UP] and yc >=rad+move:
-            yc -= move #substract 5 from the x value  
-            insSquare.y -= move
-            
-        checkCollide = square.colliderect(insSquare)
-        if checkCollide:
-            square.x=random.randint(wbox, WIDTH-wbox)
-            square.y=random.randint(hbox, HEIGHT-hbox)   
-            changeColor()
-            sq_color=colors.get(randColor)
-            rad +=move
-            ibox=int(rad*math.sqrt(2))
-            startpoint = (int(xc-ibox/2),int(yc-ibox/2))
-            insSquare=pygame.Rect(startpoint[0],startpoint[1],ibox,ibox)
-        pygame.draw.rect(screen, sq_color, square)
-        pygame.draw.rect(screen,cr_color, insSquare )
-        pygame.draw.circle(screen, cr_color, (xc,yc), rad)
+    #initialise pygame
+    mixer.init()
+    pygame.init()
+
+    #game window dimensions
+    WIDTH = 400
+    HEIGHT = 600
+
+    #create game window
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption('Jumpy')
+
+    #set frame rate
+    clock = pygame.time.Clock()
+    FPS = 60
+
+    #load music and sounds
+    pygame.mixer.music.load('music.wav')
+    pygame.mixer.music.set_volume(0.6)
+    pygame.mixer.music.play(-1, 0.0)
+    jump_fx = pygame.mixer.Sound('jump.wav')
+    jump_fx.set_volume(0.5)
+    death_fx = pygame.mixer.Sound('death.wav')
+    death_fx.set_volume(0.5)
+
+
+    #game variables
+    SCROLL_THRESH = 200
+    GRAVITY = 1
+    MAX_PLATFORMS = 10
+    scroll = 0
+    bg_scroll = 0
+    game_over = False
+    score = 0
+    fade_counter = 0
+
+    if os.path.exists('score.txt'):
+        with open('score.txt', 'r') as file:
+            high_score = int(file.read())
+    else:
+        high_score = 0
+
+    #define colours
+    WHITE = (255, 255, 255)
+    BLACK = (0, 0, 0)
+    PANEL = (153, 217, 234)
+
+    #define font
+    font_small = pygame.font.SysFont('Lucida Sans', 20)
+    font_big = pygame.font.SysFont('Lucida Sans', 24)
+
+    #load images
+    jumpy_image = pygame.image.load('jump.png').convert_alpha()
+    bg_image = pygame.image.load('bg.png').convert_alpha()
+    platform_image = pygame.image.load('wood.png').convert_alpha()
+    #bird spritesheet
+    bird_sheet_img = pygame.image.load('bird.png').convert_alpha()
+    bird_sheet = SpriteSheet(bird_sheet_img)
+
+
+    #function for outputting text onto the screen
+    def draw_text(text, font, text_col, x, y):
+        img = font.render(text, True, text_col)
+        screen.blit(img, (x, y))
+
+    #function for drawing info panel
+    def draw_panel():
+        pygame.draw.rect(screen, PANEL, (0, 0, WIDTH, 30))
+        pygame.draw.line(screen, WHITE, (0, 30), (WIDTH, 30), 2)
+        draw_text('SCORE: ' + str(score), font_small, WHITE, 0, 0)
+
+
+    #function for drawing the background
+    def draw_bg(bg_scroll):
+        screen.blit(bg_image, (0, 0 + bg_scroll))
+        screen.blit(bg_image, (0, -600 + bg_scroll))
+
+    #player class
+    class Player():
+        def __init__(self, x, y):
+            self.image = pygame.transform.scale(jumpy_image, (45, 45))
+            self.width = 25
+            self.height = 40
+            self.rect = pygame.Rect(0, 0, self.width, self.height)
+            self.rect.center = (x, y)
+            self.vel_y = 0
+            self.flip = False
+
+        def move(self):
+            #reset variables
+            scroll = 0
+            dx = 0
+            dy = 0
+
+            #process keypresses
+            key = pygame.key.get_pressed()
+            if key[pygame.K_a]:
+                dx = -10
+                self.flip = True
+            if key[pygame.K_d]:
+                dx = 10
+                self.flip = False
+
+            #gravity
+            self.vel_y += GRAVITY
+            dy += self.vel_y
+
+            #ensure player doesn't go off the edge of the screen
+            if self.rect.left + dx < 0:
+                dx = -self.rect.left
+            if self.rect.right + dx > WIDTH:
+                dx = WIDTH - self.rect.right
+
+            #check collision with platforms
+            for platform in platform_group:
+                #collision in the y direction
+                if platform.rect.colliderect(self.rect.x, self.rect.y + dy, self.width, self.height):
+                    #check if above the platform
+                    if self.rect.bottom < platform.rect.centery:
+                        if self.vel_y > 0:
+                            self.rect.bottom = platform.rect.top
+                            dy = 0
+                            self.vel_y = -20
+                            jump_fx.play()
+
+            #check if the player has bounced to the top of the screen
+            if self.rect.top <= SCROLL_THRESH:
+                #if player is jumping
+                if self.vel_y < 0:
+                    scroll = -dy
+
+            #update rectangle position
+            self.rect.x += dx
+            self.rect.y += dy + scroll
+
+            #update mask
+            self.mask = pygame.mask.from_surface(self.image)
+
+            return scroll
+
+        def draw(self):
+            screen.blit(pygame.transform.flip(self.image, self.flip, False), (self.rect.x - 12, self.rect.y - 5))
+
+    #platform class
+    class Platform(pygame.sprite.Sprite):
+        def __init__(self, x, y, width, moving):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.transform.scale(platform_image, (width, 10))
+            self.moving = moving
+            self.move_counter = random.randint(0, 50)
+            self.direction = random.choice([-1, 1])
+            self.speed = random.randint(1, 2)
+            self.rect = self.image.get_rect()
+            self.rect.x = x
+            self.rect.y = y
+
+        def update(self, scroll):
+            #moving platform side to side if it is a moving platform
+            if self.moving == True:
+                self.move_counter += 1
+                self.rect.x += self.direction * self.speed
+
+            #change platform direction if it has moved fully or hit a wall
+            if self.move_counter >= 100 or self.rect.left < 0 or self.rect.right > WIDTH:
+                self.direction *= -1
+                self.move_counter = 0
+
+            #update platform's vertical position
+            self.rect.y += scroll
+
+            #check if platform has gone off the screen
+            if self.rect.top > HEIGHT:
+                self.kill()
+
+    #player instance
+    jumpy = Player(WIDTH // 2, HEIGHT - 150)
+
+    #create sprite groups
+    platform_group = pygame.sprite.Group()
+    enemy_group = pygame.sprite.Group()
+
+    #create starting platform
+    platform = Platform(WIDTH // 2 - 50, HEIGHT - 50, 100, False)
+    platform_group.add(platform)
+
+    #game loop
+    run = True
+    while run:
+
+        clock.tick(FPS)
+
+        if game_over == False:
+            scroll = jumpy.move()
+
+            #draw background
+            bg_scroll += scroll
+            if bg_scroll >= 600:
+                bg_scroll = 0
+            draw_bg(bg_scroll)
+
+            #generate platforms
+            if len(platform_group) < MAX_PLATFORMS:
+                p_w = random.randint(40, 60)
+                p_x = random.randint(0, WIDTH - p_w)
+                p_y = platform.rect.y - random.randint(80, 120)
+                p_type = random.randint(1, 2)
+                if p_type == 1 and score > 500:
+                    p_moving = True
+                else:
+                    p_moving = False
+                platform = Platform(p_x, p_y, p_w, p_moving)
+                platform_group.add(platform)
+
+            #update platforms
+            platform_group.update(scroll)
+
+            #generate enemies
+            if len(enemy_group) == 0 and score > 1500:
+                enemy = Enemy(WIDTH, 100, bird_sheet, 1.5)
+                enemy_group.add(enemy)
+
+            #update enemies
+            enemy_group.update(scroll, WIDTH)
+
+            #update score
+            if scroll > 0:
+                score += scroll
+
+            #draw line at previous high score
+            pygame.draw.line(screen, WHITE, (0, score - high_score + SCROLL_THRESH), (WIDTH, score - high_score + SCROLL_THRESH), 3)
+            draw_text('HIGH SCORE', font_small, WHITE, WIDTH - 130, score - high_score + SCROLL_THRESH)
+
+            #draw sprites
+            platform_group.draw(screen)
+            enemy_group.draw(screen)
+            jumpy.draw()
+
+            #draw panel
+            draw_panel()
+
+            #check game over
+            if jumpy.rect.top > HEIGHT:
+                game_over = True
+                death_fx.play()
+            #check for collision with enemies
+            if pygame.sprite.spritecollide(jumpy, enemy_group, False):
+                if pygame.sprite.spritecollide(jumpy, enemy_group, False, pygame.sprite.collide_mask):
+                    game_over = True
+                    death_fx.play()
+        else:
+            if fade_counter < WIDTH:
+                fade_counter += 5
+                for y in range(0, 6, 2):
+                    pygame.draw.rect(screen, BLACK, (0, y * 100, fade_counter, 100))
+                    pygame.draw.rect(screen, BLACK, (WIDTH - fade_counter, (y + 1) * 100, WIDTH, 100))
+            else:
+                draw_text('GAME OVER!', font_big, WHITE, 130, 200)
+                draw_text('SCORE: ' + str(score), font_big, WHITE, 130, 250)
+                draw_text('PRESS SPACE TO PLAY AGAIN', font_big, WHITE, 40, 300)
+                #update high score
+                if score > high_score:
+                    high_score = score
+                    with open('score.txt', 'w') as file:
+                        file.write(str(high_score))
+                key = pygame.key.get_pressed()
+                if key[pygame.K_SPACE]:
+                    #reset variables
+                    game_over = False
+                    score = 0
+                    scroll = 0
+                    fade_counter = 0
+                    #reposition jumpy
+                    jumpy.rect.center = (WIDTH // 2, HEIGHT - 150)
+                    #reset enemies
+                    enemy_group.empty()
+                    #reset platforms
+                    platform_group.empty()
+                    #create starting platform
+                    platform = Platform(WIDTH // 2 - 50, HEIGHT - 50, 100, False)
+                    platform_group.add(platform)
+
+
+        #event handler
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                #update high score
+                if score > high_score:
+                    high_score = score
+                    with open('score.txt', 'w') as file:
+                        file.write(str(high_score))
+                run = False
+
+
+        #update display window
         pygame.display.update()
-        pygame.time.delay(10)
+
+
 #sq_color=colors.get('navy')
 #Making a rand c f the square
 changeColor()
@@ -310,13 +527,14 @@ while check:
             f_SEET=True
     if LEV_I:
         screen.fill(background)
-        playGame()
+        game()
         LEV_I=False
         MAIN=True
         xm=0
         ym=0
     if LEV_II:
         screen.fill(background)
+        game()
         TitleMenu("LEVEL II")
         if keys[pygame.K_ESCAPE]:
             LEV_II=False
