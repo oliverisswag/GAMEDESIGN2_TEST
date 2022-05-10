@@ -1,20 +1,4 @@
-#MAria I SUarez
-#learning how to draw circles and rectangles
-#use keys to move objects
-#Using Dictionaries
-
-#Objective of the game is for the rect to run away fom the circle, if they collide the circle etas the square, 
-#circle will  get larger, and a new rect should appear somewhere on the screen
-# K_UP                  up circle
-# K_DOWN                down circle
-# K_RIGHT               right circle
-# K_LEFT                left circle
-# K_a                   left square
-# K_d                   right square
-# K_w                   up square
-# K_s                   down square
-# K_SPACE               jump
-#initialize pygame
+\
 import os, random, time, pygame, math, datetime
 from turtle import screensize
 os.system('cls')
@@ -166,6 +150,11 @@ def changeScreenSize(xm,ym):
         HEIGHT=600
         WIDTH=600
     screen=pygame.display.set_mode((WIDTH,HEIGHT))
+
+#menu music
+pygame.mixer.music.load('music.wav')
+pygame.mixer.music.set_volume(0.6)
+pygame.mixer.music.play(-1, 0.0)
  
 def game():
     #import libraries
@@ -471,7 +460,8 @@ def game():
 
         #update display window
         pygame.display.update()
-
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('music.wav')
 
 
 def game2():
@@ -500,7 +490,7 @@ def game2():
     FPS = 60
 
     #load music and sounds
-    pygame.mixer.music.load('music.wav')
+    pygame.mixer.music.load('OMFG_-_Hello_(getmp3.pro).wav')
     pygame.mixer.music.set_volume(0.6)
     pygame.mixer.music.play(-1, 0.0)
     jump_fx = pygame.mixer.Sound('jump.wav')
@@ -778,6 +768,10 @@ def game2():
 
         #update display window
         pygame.display.update()
+    pygame.mixer.music.stop()
+pygame.mixer.music.load('music.wav')
+    
+
 
 def game3():
     #import libraries
@@ -1083,6 +1077,8 @@ def game3():
 
         #update display window
         pygame.display.update()
+        pygame.mixer.music.stop()
+    pygame.mixer.music.load('music.wav')
 #sq_color=colors.get('navy')
 #Making a rand c f the square
 changeColor()
